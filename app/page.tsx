@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef } from 'react';
-import { Hammer, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlayCircle, PlusCircle, Users } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Hammer, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlusCircle, Users } from 'lucide-react';
+// IMPORTANTE: Importe o supabase que você configurou no projeto
+import { supabase } from '@/lib/supabase'; 
 
 const CATEGORIES = ["TODOS", "BANHEIRO", "COZINHA", "SALA", "HALL DE ENTRADA", "QUARTO SIMPLES", "QUARTO CLOSET"];
 
@@ -11,7 +13,7 @@ export default function TopazioSite() {
   const [showAddModal, setShowAddModal] = useState(false); 
   const [password, setPassword] = useState("");
   const [activeCategory, setActiveCategory] = useState("TODOS");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
   
   const [backgroundImage, setBackgroundImage] = useState("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1920");
 
@@ -20,30 +22,41 @@ export default function TopazioSite() {
   const [newMaterial, setNewMaterial] = useState("");
   const [newDescription, setNewDescription] = useState(""); 
   
-  // Estados para gerenciar as múltiplas mídias
   const [previewMedia, setPreviewMedia] = useState<{ url: string, type: 'image' | 'video' }[]>([]);
-  const [carouselIndices, setCarouselIndices] = useState<{[key: number]: number}>({});
+  const [carouselIndices, setCarouselIndices] = useState<{[key: string]: number}>({});
+  const [projects, setProjects] = useState<any[]>([]);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const bgInput = useRef<HTMLInputElement>(null);
 
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      title: "Cozinha Americana Premium",
-      category: "COZINHA",
-      material: "MDF Louro Freijó",
-      description: "Um espaço planejado para unir funcionalidade e sofisticação no coração da casa.",
-      images: [{ url: "https://images.unsplash.com/photo-1556912177-4594669539ec?q=80&w=800", type: "image" as const }],
-    }
-  ]);
+  // --- BUSCAR DADOS DO SUPABASE ---
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
-  // Função para mudar foto do carrossel
-  const handleNextImage = (projId: number, max: number) => {
+  async function fetchProjects() {
+    const { data, error } = await supabase
+      .from('projetos')
+      .select('*')
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error("Erro ao buscar:", error);
+    } else if (data) {
+      // Ajusta o formato caso as imagens estejam salvas como string simples
+      const formatted = data.map(p => ({
+        ...p,
+        images: p.images || [{ url: p.imagem_url, type: 'image' }]
+      }));
+      setProjects(formatted);
+    }
+  }
+
+  const handleNextImage = (projId: any, max: number) => {
     setCarouselIndices(prev => ({ ...prev, [projId]: ((prev[projId] || 0) + 1) % max }));
   };
 
-  const handlePrevImage = (projId: number, max: number) => {
+  const handlePrevImage = (projId: any, max: number) => {
     setCarouselIndices(prev => ({ ...prev, [projId]: ((prev[projId] || 0) - 1 + max) % max }));
   };
 
@@ -76,54 +89,61 @@ export default function TopazioSite() {
     }
   };
 
-  const handlePublish = () => {
+  // --- SALVAR NO SUPABASE ---
+  const handlePublish = async () => {
     if (!newTitle || previewMedia.length === 0) return alert("Preencha o título e selecione pelo menos uma foto!");
     
+    const projectData = {
+      titulo: newTitle,
+      categoria: newCategory,
+      material: newMaterial,
+      descricao: newDescription,
+      imagem_url: previewMedia[0].url, // Pega a primeira foto para o campo principal
+      images: previewMedia // Salva a array completa (Certifique-se que a coluna no Supabase é JSONB)
+    };
+
     if (editingId) {
-      setProjects(projects.map(p => p.id === editingId ? {
-        ...p,
-        title: newTitle,
-        category: newCategory,
-        material: newMaterial,
-        description: newDescription,
-        images: previewMedia,
-      } : p));
+      const { error } = await supabase
+        .from('projetos')
+        .update(projectData)
+        .eq('id', editingId);
+
+      if (error) return alert("Erro ao atualizar: " + error.message);
       alert("Projeto atualizado!");
     } else {
-      const novoProjeto = {
-        id: Date.now(),
-        title: newTitle,
-        category: newCategory,
-        material: newMaterial,
-        description: newDescription,
-        images: previewMedia,
-      };
-      setProjects([novoProjeto, ...projects]);
-      alert("Projeto adicionado!");
+      const { error } = await supabase
+        .from('projetos')
+        .insert([projectData]);
+
+      if (error) return alert("Erro ao salvar: " + error.message);
+      alert("Projeto publicado com sucesso!");
     }
 
     setNewTitle(""); setNewMaterial(""); setNewDescription(""); setPreviewMedia([]);
     setEditingId(null);
-    setShowAddModal(false); 
+    setShowAddModal(false);
+    fetchProjects(); // Recarrega a lista sem precisar de F5
   };
 
-  const deleteProject = (id: number) => {
+  const deleteProject = async (id: any) => {
     if(confirm("Tem certeza que deseja excluir este projeto?")) {
-      setProjects(projects.filter(p => p.id !== id));
+      const { error } = await supabase.from('projetos').delete().eq('id', id);
+      if (error) return alert("Erro ao excluir");
+      fetchProjects();
     }
   };
 
   const startEdit = (proj: any) => {
     setEditingId(proj.id);
-    setNewTitle(proj.title);
-    setNewCategory(proj.category);
+    setNewTitle(proj.titulo);
+    setNewCategory(proj.categoria || "COZINHA");
     setNewMaterial(proj.material);
-    setNewDescription(proj.description);
+    setNewDescription(proj.descricao);
     setPreviewMedia(proj.images);
     setShowAddModal(true); 
   };
 
-  const filteredProjects = activeCategory === "TODOS" ? projects : projects.filter(p => p.category === activeCategory);
+  const filteredProjects = activeCategory === "TODOS" ? projects : projects.filter(p => p.categoria === activeCategory);
 
   return (
     <main className="min-h-screen font-sans text-zinc-900 relative">
@@ -171,7 +191,7 @@ export default function TopazioSite() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
           {filteredProjects.map((proj) => {
             const currentIndex = carouselIndices[proj.id] || 0;
-            const currentMedia = proj.images[currentIndex];
+            const currentMedia = proj.images?.[currentIndex] || { url: proj.imagem_url, type: 'image' };
 
             return (
               <div key={proj.id} className="bg-white/80 backdrop-blur-sm rounded-[2.5rem] overflow-hidden shadow-xl border border-white/50 group transition-all hover:shadow-2xl relative">
@@ -187,34 +207,29 @@ export default function TopazioSite() {
                   {currentMedia.type === 'video' ? (
                     <video src={currentMedia.url} controls className="w-full h-full object-cover" />
                   ) : (
-                    <img src={currentMedia.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={proj.title} />
+                    <img src={currentMedia.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={proj.titulo} />
                   )}
                   
-                  {proj.images.length > 1 && (
+                  {proj.images?.length > 1 && (
                     <>
                       <button onClick={() => handlePrevImage(proj.id, proj.images.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full z-20 backdrop-blur-sm transition-all"><ChevronLeft size={20}/></button>
                       <button onClick={() => handleNextImage(proj.id, proj.images.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full z-20 backdrop-blur-sm transition-all"><ChevronRight size={20}/></button>
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-                        {proj.images.map((_, i) => (
-                          <div key={i} className={`h-1.5 rounded-full transition-all ${i === currentIndex ? "w-6 bg-yellow-500" : "w-1.5 bg-white/50"}`} />
-                        ))}
-                      </div>
                     </>
                   )}
 
                   <div className="absolute top-4 left-4 bg-yellow-500 text-black text-[9px] px-3 py-1 rounded-full font-black uppercase shadow-md z-10">
-                    {proj.category}
+                    {proj.categoria}
                   </div>
                 </div>
                 <div className="p-8">
                   <span className="text-zinc-500 font-black text-[10px] uppercase tracking-widest">{proj.material}</span>
-                  <h3 className="text-xl font-black text-zinc-900 uppercase italic tracking-tighter mb-2">{proj.title}</h3>
-                  {proj.description && <p className="text-zinc-600 text-sm font-medium italic mb-4 leading-relaxed">"{proj.description}"</p>}
+                  <h3 className="text-xl font-black text-zinc-900 uppercase italic tracking-tighter mb-2">{proj.titulo}</h3>
+                  {proj.descricao && <p className="text-zinc-600 text-sm font-medium italic mb-4 leading-relaxed">"{proj.descricao}"</p>}
                   
                   <button 
                      onClick={() => {
-                       const ambient = proj.category === "TODOS" ? "projeto planejado" : proj.category.toLowerCase();
-                       const msg = `Olá! Tenho interesse em um orçamento de um(a) ${ambient}. (Referência: ${proj.title})`;
+                       const ambient = proj.categoria === "TODOS" ? "projeto planejado" : proj.categoria.toLowerCase();
+                       const msg = `Olá! Tenho interesse em um orçamento de um(a) ${ambient}. (Referência: ${proj.titulo})`;
                        window.open(`https://wa.me/5544998550741?text=${encodeURIComponent(msg)}`);
                      }}
                      className="w-full py-3 bg-zinc-900 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-yellow-500 hover:text-black transition-all"
@@ -228,7 +243,7 @@ export default function TopazioSite() {
         </div>
       </section>
 
-      {/* SEÇÃO SOBRE NÓS COM FUNDO MADEIRADO */}
+      {/* SEÇÃO HISTÓRIA */}
       <section className="relative z-10 max-w-4xl mx-auto px-6 py-20">
         <div className="relative rounded-[3rem] p-10 md:p-16 shadow-2xl overflow-hidden border border-white/10">
           <div 
@@ -246,11 +261,6 @@ export default function TopazioSite() {
             <p className="text-zinc-100 font-medium leading-relaxed text-lg italic">
               "Na <strong className="text-yellow-500 uppercase tracking-tighter">Topázio Ambientes Planejados</strong>, transformamos sonhos em realidade com precisão e acabamento impecável. Com mais de 17 anos de experiência no mercado de Maringá, nossa missão é entregar qualidade superior e design inteligente para cada canto do seu lar."
             </p>
-            <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6 text-[10px] font-black uppercase tracking-[0.2em] text-yellow-500/80">
-              <div className="flex flex-col items-center gap-2"><div className="h-px w-8 bg-yellow-500"></div> 📐 Qualidade</div>
-              <div className="flex flex-col items-center gap-2"><div className="h-px w-8 bg-yellow-500"></div> ⏱ Prazo 30 Dias</div>
-              <div className="flex flex-col items-center gap-2"><div className="h-px w-8 bg-yellow-500"></div> ✨ Fino Acabamento</div>
-            </div>
           </div>
         </div>
       </section>
@@ -278,10 +288,6 @@ export default function TopazioSite() {
 
             <div className="space-y-6">
               <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700">
-                <h3 className="text-yellow-500 font-black uppercase text-sm mb-4 tracking-widest flex items-center gap-2">
-                   <PlusCircle size={20}/> {editingId ? "Editando Projeto" : "Novo Cadastro"}
-                </h3>
-                
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Título do Projeto" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
@@ -292,34 +298,14 @@ export default function TopazioSite() {
                   <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Material (Ex: MDF Louro Freijó)" value={newMaterial} onChange={e => setNewMaterial(e.target.value)} />
                   <textarea className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-medium h-24 resize-none outline-none focus:border-yellow-500" placeholder="Descrição curta..." value={newDescription} onChange={e => setNewDescription(e.target.value)} />
                   
-                  {/* UPLOAD MÚLTIPLO */}
                   <div onClick={() => fileInput.current?.click()} className="border-2 border-dashed border-zinc-600 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800 transition-colors">
                       <Camera className="text-zinc-500 mb-2" size={32} />
                       <p className="text-xs font-black text-white uppercase tracking-tighter">Clique para selecionar várias Fotos/Vídeos</p>
                       <input type="file" hidden ref={fileInput} multiple onChange={handleFileChange} accept="image/*,video/*" />
                   </div>
 
-                  {/* MINIATURAS NO ADMIN */}
-                  {previewMedia.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto p-4 bg-zinc-900 rounded-xl border border-zinc-700">
-                      {previewMedia.map((media, i) => (
-                        <div key={i} className="relative min-w-[100px] h-20 rounded-lg overflow-hidden border border-zinc-600 group">
-                          {media.type === 'video' ? (
-                            <video src={media.url} className="w-full h-full object-cover" />
-                          ) : (
-                            <img src={media.url} className="w-full h-full object-cover" />
-                          )}
-                          <button onClick={(e) => { e.stopPropagation(); setPreviewMedia(previewMedia.filter((_, idx) => idx !== i)); }} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                    <button onClick={() => bgInput.current?.click()} className="bg-zinc-800 text-white py-4 rounded-xl font-black text-[10px] uppercase border border-zinc-700 hover:bg-zinc-700">Alterar Fundo do Site</button>
-                    <input type="file" hidden ref={bgInput} onChange={handleBgChange} accept="image/*" />
-                    
-                    <button onClick={handlePublish} className="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase shadow-xl hover:bg-yellow-400 transition-all">
+                    <button onClick={handlePublish} className="w-full bg-yellow-500 text-black py-4 rounded-xl font-black uppercase shadow-xl hover:bg-yellow-400 transition-all col-span-2">
                       {editingId ? "Salvar Alterações" : "Publicar Projeto +"}
                     </button>
                   </div>
