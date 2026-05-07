@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Hammer, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlusCircle, Users } from 'lucide-react';
-// IMPORTANTE: Importe o supabase que você configurou no projeto
-import { supabase } from '@/lib/supabase'; 
+import { supabase } from '../lib/supabase';
 
 const CATEGORIES = ["TODOS", "BANHEIRO", "COZINHA", "SALA", "HALL DE ENTRADA", "QUARTO SIMPLES", "QUARTO CLOSET"];
 
-export default function TopazioSite() {
+// RENOMEADO DE TopazioSite PARA Page PARA A VERCEL RECONHECER
+export default function Page() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false); 
@@ -27,28 +27,28 @@ export default function TopazioSite() {
   const [projects, setProjects] = useState<any[]>([]);
 
   const fileInput = useRef<HTMLInputElement>(null);
-  const bgInput = useRef<HTMLInputElement>(null);
 
-  // --- BUSCAR DADOS DO SUPABASE ---
   useEffect(() => {
     fetchProjects();
   }, []);
 
   async function fetchProjects() {
-    const { data, error } = await supabase
-      .from('projetos')
-      .select('*')
-      .order('id', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('projetos')
+        .select('*')
+        .order('id', { ascending: false });
 
-    if (error) {
-      console.error("Erro ao buscar:", error);
-    } else if (data) {
-      // Ajusta o formato caso as imagens estejam salvas como string simples
-      const formatted = data.map(p => ({
-        ...p,
-        images: p.images || [{ url: p.imagem_url, type: 'image' }]
-      }));
-      setProjects(formatted);
+      if (error) throw error;
+      if (data) {
+        const formatted = data.map((p: any) => ({
+          ...p,
+          images: p.images || (p.imagem_url ? [{ url: p.imagem_url, type: 'image' }] : [])
+        }));
+        setProjects(formatted);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar projetos:", err);
     }
   }
 
@@ -79,17 +79,6 @@ export default function TopazioSite() {
     }
   };
 
-  const handleBgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => { setBackgroundImage(reader.result as string); };
-      reader.readAsDataURL(file);
-      alert("Imagem de fundo atualizada!");
-    }
-  };
-
-  // --- SALVAR NO SUPABASE ---
   const handlePublish = async () => {
     if (!newTitle || previewMedia.length === 0) return alert("Preencha o título e selecione pelo menos uma foto!");
     
@@ -97,32 +86,34 @@ export default function TopazioSite() {
       titulo: newTitle,
       categoria: newCategory,
       material: newMaterial,
-      descricao: newDescription,
-      imagem_url: previewMedia[0].url, // Pega a primeira foto para o campo principal
-      images: previewMedia // Salva a array completa (Certifique-se que a coluna no Supabase é JSONB)
+      descricao: newDescription, 
+      imagem_url: previewMedia[0].url,
+      images: previewMedia 
     };
 
-    if (editingId) {
-      const { error } = await supabase
-        .from('projetos')
-        .update(projectData)
-        .eq('id', editingId);
+    try {
+      if (editingId) {
+        const { error } = await supabase
+          .from('projetos')
+          .update(projectData)
+          .eq('id', editingId);
+        if (error) throw error;
+        alert("Projeto atualizado!");
+      } else {
+        const { error } = await supabase
+          .from('projetos')
+          .insert([projectData]);
+        if (error) throw error;
+        alert("Projeto publicado com sucesso!");
+      }
 
-      if (error) return alert("Erro ao atualizar: " + error.message);
-      alert("Projeto atualizado!");
-    } else {
-      const { error } = await supabase
-        .from('projetos')
-        .insert([projectData]);
-
-      if (error) return alert("Erro ao salvar: " + error.message);
-      alert("Projeto publicado com sucesso!");
+      setNewTitle(""); setNewMaterial(""); setNewDescription(""); setPreviewMedia([]);
+      setEditingId(null);
+      setShowAddModal(false);
+      fetchProjects();
+    } catch (err: any) {
+      alert("Erro no Supabase: " + err.message);
     }
-
-    setNewTitle(""); setNewMaterial(""); setNewDescription(""); setPreviewMedia([]);
-    setEditingId(null);
-    setShowAddModal(false);
-    fetchProjects(); // Recarrega a lista sem precisar de F5
   };
 
   const deleteProject = async (id: any) => {
@@ -138,8 +129,8 @@ export default function TopazioSite() {
     setNewTitle(proj.titulo);
     setNewCategory(proj.categoria || "COZINHA");
     setNewMaterial(proj.material);
-    setNewDescription(proj.descricao);
-    setPreviewMedia(proj.images);
+    setNewDescription(proj.descricao || "");
+    setPreviewMedia(proj.images || []);
     setShowAddModal(true); 
   };
 
@@ -147,7 +138,6 @@ export default function TopazioSite() {
 
   return (
     <main className="min-h-screen font-sans text-zinc-900 relative">
-      
       <div 
         className="fixed inset-0 z-0 opacity-30 pointer-events-none bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${backgroundImage})` }}
@@ -195,7 +185,6 @@ export default function TopazioSite() {
 
             return (
               <div key={proj.id} className="bg-white/80 backdrop-blur-sm rounded-[2.5rem] overflow-hidden shadow-xl border border-white/50 group transition-all hover:shadow-2xl relative">
-                
                 {isAdmin && (
                   <div className="absolute top-3 right-3 z-30 flex gap-2">
                     <button onClick={() => startEdit(proj)} className="bg-white text-black p-2 rounded-lg shadow-md border border-zinc-200"><Edit3 size={18}/></button>
@@ -250,7 +239,6 @@ export default function TopazioSite() {
             className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.3]"
             style={{ backgroundImage: `url('https://images.unsplash.com/photo-1541123437800-1bb1317badc2?q=80&w=1920')` }}
           />
-          
           <div className="relative z-10 text-center">
             <Users className="mx-auto text-yellow-500 mb-6" size={40} />
             <h2 className="font-black text-4xl uppercase italic tracking-tighter mb-6 text-white">Nossa História</h2>
@@ -275,7 +263,6 @@ export default function TopazioSite() {
         </div>
       </footer>
 
-      {/* PAINEL ADMIN */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/90 z-[60] overflow-y-auto p-4 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-zinc-900 text-white p-8 rounded-[3rem] w-full max-w-2xl border border-zinc-800 shadow-2xl my-8">
@@ -316,7 +303,6 @@ export default function TopazioSite() {
         </div>
       )}
 
-      {/* LOGIN ADMIN */}
       {showAdminLogin && (
         <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-zinc-900 p-12 rounded-[3.5rem] w-full max-w-sm text-center border border-zinc-800 shadow-2xl relative">

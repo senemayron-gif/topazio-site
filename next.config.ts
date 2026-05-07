@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    // Isso vai fazer o build passar mesmo com esse erro de imagem/video
-    ignoreBuildErrors: true,
-  },
   eslint: {
-    // Previne erros de formatação de travarem o site
     ignoreDuringBuilds: true,
   },
-};
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+}
 
-export default nextConfig;
+export default nextConfig
