@@ -12,14 +12,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Topázio Ambientes Planejados | Móveis Sob Medida em Maringá',
   description: 'Referência em móveis planejados em Maringá-PR. Cozinhas, dormitórios e ambientes corporativos com acabamento premium e 17 anos de tradição.',
   keywords: ['móveis planejados Maringá', 'Topázio Ambientes', 'marcenaria Maringá', 'cozinha planejada'],
   openGraph: {
     title: 'Topázio Ambientes Planejados',
     description: 'Qualidade, precisão e acabamento em cada detalhe.',
-    images: ['/logo-topazio.png'], 
+    url: 'https://topazio-ambientes.vercel.app', // COLOQUE SEU LINK AQUI
+    siteName: 'Topázio Planejados',
+    images: [
+      {
+        url: 'https://topazio-ambientes.vercel.app/logo-topazio.png', // LINK COMPLETO DA FOTO
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'pt_BR',
+    type: 'website',
   },
 }
 

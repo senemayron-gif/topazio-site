@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Hammer, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlusCircle, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const CATEGORIES = ["TODOS", "BANHEIRO", "COZINHA", "SALA", "HALL DE ENTRADA", "QUARTO SIMPLES", "QUARTO CLOSET"];
+const CATEGORIES = ["BANHEIRO", "COZINHA", "SALA", "HALL DE ENTRADA", "QUARTO SIMPLES", "QUARTO CLOSET"];
 
 // RENOMEADO DE TopazioSite PARA Page PARA A VERCEL RECONHECER
 export default function Page() {
