@@ -11,7 +11,7 @@ export default function Page() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false); 
   const [password, setPassword] = useState("");
-  const [activeCategory, setActiveCategory] = useState("BANHEIRO"); // Começa em BANHEIRO (já que tiramos o TODOS)
+  const [activeCategory, setActiveCategory] = useState("BANHEIRO");
   const [editingId, setEditingId] = useState<number | string | null>(null);
   
   const [backgroundImage, setBackgroundImage] = useState("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1920");
@@ -81,13 +81,14 @@ export default function Page() {
   const handlePublish = async () => {
     if (!newTitle || previewMedia.length === 0) return alert("Preencha o título e selecione pelo menos uma foto!");
     
+    // Garantimos que estamos enviando uma nova referência de array [...previewMedia]
     const projectData = {
       titulo: newTitle,
       categoria: newCategory,
       material: newMaterial,
       descricao: newDescription, 
       imagem_url: previewMedia[0].url,
-      images: previewMedia 
+      images: [...previewMedia] 
     };
 
     try {
@@ -95,9 +96,11 @@ export default function Page() {
         const { error } = await supabase
           .from('projetos')
           .update(projectData)
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .select(); // Força o retorno para confirmar o update
+
         if (error) throw error;
-        alert("Projeto atualizado!");
+        alert("Projeto atualizado com sucesso!");
       } else {
         const { error } = await supabase
           .from('projetos')
@@ -106,14 +109,16 @@ export default function Page() {
         alert("Projeto publicado com sucesso!");
       }
 
-      // LIMPEZA TOTAL DO FORMULÁRIO APÓS SALVAR
+      // Limpeza completa e fechamento
       setNewTitle(""); 
       setNewMaterial(""); 
       setNewDescription(""); 
       setPreviewMedia([]);
       setEditingId(null);
       setShowAddModal(false);
-      fetchProjects();
+      
+      // Atualiza a lista local com o que está no banco agora
+      await fetchProjects();
     } catch (err: any) {
       alert("Erro no Supabase: " + err.message);
     }
@@ -137,7 +142,6 @@ export default function Page() {
     setShowAddModal(true); 
   };
 
-  // Filtro direto por categoria (sem o TODOS)
   const filteredProjects = projects.filter(p => p.categoria === activeCategory);
 
   return (
@@ -289,13 +293,12 @@ export default function Page() {
                   <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Material (Ex: MDF Louro Freijó)" value={newMaterial} onChange={e => setNewMaterial(e.target.value)} />
                   <textarea className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-medium h-24 resize-none outline-none focus:border-yellow-500" placeholder="Descrição curta..." value={newDescription} onChange={e => setNewDescription(e.target.value)} />
                   
-                  {/* BOTÃO PARA LIMPAR AS FOTOS - ÚTIL PARA TROCAR IMAGEM NA EDIÇÃO */}
                   {previewMedia.length > 0 && (
                     <button 
                       onClick={() => setPreviewMedia([])} 
                       className="text-red-500 text-[10px] font-black uppercase hover:underline mb-2"
                     >
-                      Limpar fotos atuais para trocar
+                      Limpar mídias para trocar
                     </button>
                   )}
 
