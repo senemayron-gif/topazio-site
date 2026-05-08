@@ -6,13 +6,12 @@ import { supabase } from '../lib/supabase';
 
 const CATEGORIES = ["BANHEIRO", "COZINHA", "SALA", "HALL DE ENTRADA", "QUARTO SIMPLES", "QUARTO CLOSET"];
 
-// RENOMEADO DE TopazioSite PARA Page PARA A VERCEL RECONHECER
 export default function Page() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false); 
   const [password, setPassword] = useState("");
-  const [activeCategory, setActiveCategory] = useState("TODOS");
+  const [activeCategory, setActiveCategory] = useState("BANHEIRO"); // Começa em BANHEIRO (já que tiramos o TODOS)
   const [editingId, setEditingId] = useState<number | string | null>(null);
   
   const [backgroundImage, setBackgroundImage] = useState("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1920");
@@ -107,7 +106,11 @@ export default function Page() {
         alert("Projeto publicado com sucesso!");
       }
 
-      setNewTitle(""); setNewMaterial(""); setNewDescription(""); setPreviewMedia([]);
+      // LIMPEZA TOTAL DO FORMULÁRIO APÓS SALVAR
+      setNewTitle(""); 
+      setNewMaterial(""); 
+      setNewDescription(""); 
+      setPreviewMedia([]);
       setEditingId(null);
       setShowAddModal(false);
       fetchProjects();
@@ -128,13 +131,14 @@ export default function Page() {
     setEditingId(proj.id);
     setNewTitle(proj.titulo);
     setNewCategory(proj.categoria || "COZINHA");
-    setNewMaterial(proj.material);
+    setNewMaterial(proj.material || "");
     setNewDescription(proj.descricao || "");
     setPreviewMedia(proj.images || []);
     setShowAddModal(true); 
   };
 
-  const filteredProjects = activeCategory === "TODOS" ? projects : projects.filter(p => p.categoria === activeCategory);
+  // Filtro direto por categoria (sem o TODOS)
+  const filteredProjects = projects.filter(p => p.categoria === activeCategory);
 
   return (
     <main className="min-h-screen font-sans text-zinc-900 relative">
@@ -217,7 +221,7 @@ export default function Page() {
                   
                   <button 
                      onClick={() => {
-                       const ambient = proj.categoria === "TODOS" ? "projeto planejado" : proj.categoria.toLowerCase();
+                       const ambient = proj.categoria.toLowerCase();
                        const msg = `Olá! Tenho interesse em um orçamento de um(a) ${ambient}. (Referência: ${proj.titulo})`;
                        window.open(`https://wa.me/5544998550741?text=${encodeURIComponent(msg)}`);
                      }}
@@ -268,9 +272,9 @@ export default function Page() {
           <div className="bg-zinc-900 text-white p-8 rounded-[3rem] w-full max-w-2xl border border-zinc-800 shadow-2xl my-8">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-3xl font-black text-yellow-500 uppercase italic tracking-tighter">
-                {editingId ? "Editar Projeto" : "Painel Administrativo"}
+                {editingId ? "Editar Projeto" : "Novo Projeto"}
               </h2>
-              <button onClick={() => {setShowAddModal(false); setEditingId(null); setPreviewMedia([]);}} className="text-white hover:bg-red-600 p-2 bg-zinc-800 rounded-full transition-colors"><X/></button>
+              <button onClick={() => {setShowAddModal(false); setEditingId(null); setPreviewMedia([]); setNewTitle(""); setNewMaterial(""); setNewDescription("");}} className="text-white hover:bg-red-600 p-2 bg-zinc-800 rounded-full transition-colors"><X/></button>
             </div>
 
             <div className="space-y-6">
@@ -279,12 +283,22 @@ export default function Page() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Título do Projeto" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
                     <select className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-black outline-none focus:border-yellow-500" value={newCategory} onChange={e => setNewCategory(e.target.value)}>
-                      {CATEGORIES.filter(c => c !== "TODOS").map(c => <option key={c} value={c} className="bg-zinc-900">{c}</option>)}
+                      {CATEGORIES.map(c => <option key={c} value={c} className="bg-zinc-900">{c}</option>)}
                     </select>
                   </div>
                   <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Material (Ex: MDF Louro Freijó)" value={newMaterial} onChange={e => setNewMaterial(e.target.value)} />
                   <textarea className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-medium h-24 resize-none outline-none focus:border-yellow-500" placeholder="Descrição curta..." value={newDescription} onChange={e => setNewDescription(e.target.value)} />
                   
+                  {/* BOTÃO PARA LIMPAR AS FOTOS - ÚTIL PARA TROCAR IMAGEM NA EDIÇÃO */}
+                  {previewMedia.length > 0 && (
+                    <button 
+                      onClick={() => setPreviewMedia([])} 
+                      className="text-red-500 text-[10px] font-black uppercase hover:underline mb-2"
+                    >
+                      Limpar fotos atuais para trocar
+                    </button>
+                  )}
+
                   <div onClick={() => fileInput.current?.click()} className="border-2 border-dashed border-zinc-600 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800 transition-colors">
                       <Camera className="text-zinc-500 mb-2" size={32} />
                       <p className="text-xs font-black text-white uppercase tracking-tighter">Clique para selecionar várias Fotos/Vídeos</p>
