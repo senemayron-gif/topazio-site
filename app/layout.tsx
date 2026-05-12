@@ -13,19 +13,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Isso ajuda o Next.js a montar os links das imagens sozinho
+  metadataBase: new URL('https://topazio-site.vercel.app'),
+  
   title: 'Topázio Ambientes Planejados | Móveis Sob Medida em Maringá',
-  description: 'Referência em móveis planejados em Maringá-PR. Cozinhas, dormitórios e ambientes corporativos com acabamento premium e 17 anos de tradição.',
+  description: 'Móveis planejados de alto padrão em Maringá-PR. 17 anos de tradição, qualidade e acabamento impecável.',
   keywords: ['móveis planejados Maringá', 'Topázio Ambientes', 'marcenaria Maringá', 'cozinha planejada'],
+  
   openGraph: {
     title: 'Topázio Ambientes Planejados',
     description: 'Qualidade, precisão e acabamento em cada detalhe.',
-    url: 'https://topazio-ambientes.vercel.app', // COLOQUE SEU LINK AQUI
+    url: 'https://topazio-site.vercel.app',
     siteName: 'Topázio Planejados',
     images: [
       {
-        url: 'https://topazio-ambientes.vercel.app/logo-topazio.png', // LINK COMPLETO DA FOTO
+        url: '/logo-topazio.png', // O Next.js busca dentro da pasta public
         width: 1200,
         height: 630,
+        alt: 'Topázio Ambientes Planejados',
       },
     ],
     locale: 'pt_BR',

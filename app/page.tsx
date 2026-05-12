@@ -59,9 +59,10 @@ export default function Page() {
     setCarouselIndices(prev => ({ ...prev, [projId]: ((prev[projId] || 0) - 1 + max) % max }));
   };
 
+  // FUNÇÃO AJUSTADA PARA CORRIGIR O BUG DE SELEÇÃO
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
+    if (files && files.length > 0) {
       const filesArray = Array.from(files);
       const promises = filesArray.map(file => {
         return new Promise<{ url: string, type: 'image' | 'video' }>((resolve) => {
@@ -73,7 +74,9 @@ export default function Page() {
       });
 
       Promise.all(promises).then(results => {
-        setPreviewMedia(prev => [...prev, ...results]);
+        // Substituímos o estado pelas novas fotos e resetamos o valor do input
+        setPreviewMedia(results);
+        e.target.value = ""; 
       });
     }
   };
@@ -81,7 +84,6 @@ export default function Page() {
   const handlePublish = async () => {
     if (!newTitle || previewMedia.length === 0) return alert("Preencha o título e selecione pelo menos uma foto!");
     
-    // Garantimos que estamos enviando uma nova referência de array [...previewMedia]
     const projectData = {
       titulo: newTitle,
       categoria: newCategory,
@@ -97,7 +99,7 @@ export default function Page() {
           .from('projetos')
           .update(projectData)
           .eq('id', editingId)
-          .select(); // Força o retorno para confirmar o update
+          .select();
 
         if (error) throw error;
         alert("Projeto atualizado com sucesso!");
@@ -109,7 +111,6 @@ export default function Page() {
         alert("Projeto publicado com sucesso!");
       }
 
-      // Limpeza completa e fechamento
       setNewTitle(""); 
       setNewMaterial(""); 
       setNewDescription(""); 
@@ -117,7 +118,6 @@ export default function Page() {
       setEditingId(null);
       setShowAddModal(false);
       
-      // Atualiza a lista local com o que está no banco agora
       await fetchProjects();
     } catch (err: any) {
       alert("Erro no Supabase: " + err.message);
@@ -322,7 +322,7 @@ export default function Page() {
 
       {showAdminLogin && (
         <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
-          <div className="bg-zinc-900 p-12 rounded-[3.5rem] w-full max-w-sm text-center border border-zinc-800 shadow-2xl relative">
+          <div className="bg-zinc-900 p-12 rounded-[3.5rem] w-full max-sm text-center border border-zinc-800 shadow-2xl relative">
             <button onClick={() => setShowAdminLogin(false)} className="absolute top-8 right-8 text-white"><X size={24}/></button>
             <Lock className="mx-auto text-yellow-500 mb-8" size={48} />
             <input 
