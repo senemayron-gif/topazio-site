@@ -1,24 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { Hammer, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlusCircle, Users } from 'lucide-react';
+import { ShoppingBag, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlusCircle, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const CATEGORIES = ["OUTROS", "BANHEIRO", "COZINHA", "SALA", "HALL DE ENTRADA", "QUARTO SIMPLES", "QUARTO CLOSET"];
+const CATEGORIES = ["OUTROS", "CALÇADOS", "ROUPAS", "FEMININAS", "MASCULINO", "INFANTIL"];
 
 export default function Page() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false); 
   const [password, setPassword] = useState("");
-  const [activeCategory, setActiveCategory] = useState("BANHEIRO");
+  const [activeCategory, setActiveCategory] = useState("CALÇADOS");
   const [editingId, setEditingId] = useState<number | string | null>(null);
   
-  const [backgroundImage, setBackgroundImage] = useState("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1920");
+  const [backgroundImage, setBackgroundImage] = useState("https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1920");
 
   const [newTitle, setNewTitle] = useState("");
-  const [newCategory, setNewCategory] = useState("COZINHA");
+  const [newCategory, setNewCategory] = useState("CALÇADOS");
   const [newMaterial, setNewMaterial] = useState("");
+  const [newPrice, setNewPrice] = useState("");
   const [newDescription, setNewDescription] = useState(""); 
   
   const [previewMedia, setPreviewMedia] = useState<{ url: string, type: 'image' | 'video' }[]>([]);
@@ -47,7 +48,7 @@ export default function Page() {
         setProjects(formatted);
       }
     } catch (err) {
-      console.error("Erro ao buscar projetos:", err);
+      console.error("Erro ao buscar produtos:", err);
     }
   }
 
@@ -86,6 +87,7 @@ export default function Page() {
       titulo: newTitle,
       categoria: newCategory,
       material: newMaterial,
+      preco: newPrice,
       descricao: newDescription, 
       imagem_url: previewMedia[0].url,
       images: [...previewMedia] 
@@ -99,17 +101,18 @@ export default function Page() {
           .eq('id', editingId);
 
         if (error) throw error;
-        alert("Projeto atualizado com sucesso!");
+        alert("Produto atualizado com sucesso!");
       } else {
         const { error } = await supabase
           .from('projetos')
           .insert([projectData]);
         if (error) throw error;
-        alert("Projeto publicado com sucesso!");
+        alert("Produto publicado com sucesso!");
       }
 
       setNewTitle(""); 
       setNewMaterial(""); 
+      setNewPrice("");
       setNewDescription(""); 
       setPreviewMedia([]);
       setEditingId(null);
@@ -121,7 +124,7 @@ export default function Page() {
   };
 
   const deleteProject = async (id: any) => {
-    if(confirm("Tem certeza que deseja excluir este projeto?")) {
+    if(confirm("Tem certeza que deseja excluir este produto?")) {
       const { error } = await supabase.from('projetos').delete().eq('id', id);
       if (error) return alert("Erro ao excluir");
       fetchProjects();
@@ -131,11 +134,22 @@ export default function Page() {
   const startEdit = (proj: any) => {
     setEditingId(proj.id);
     setNewTitle(proj.titulo);
-    setNewCategory(proj.categoria || "COZINHA");
+    setNewCategory(proj.categoria || "CALÇADOS");
     setNewMaterial(proj.material || "");
+    setNewPrice(proj.preco || "");
     setNewDescription(proj.descricao || "");
     setPreviewMedia(proj.images || []);
     setShowAddModal(true); 
+  };
+
+  const handleLogin = () => {
+    if (password === "0741") {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setPassword("");
+    } else {
+      alert("Senha Errada");
+    }
   };
 
   const filteredProjects = projects.filter(p => p.categoria === activeCategory);
@@ -152,15 +166,15 @@ export default function Page() {
           onClick={() => isAdmin ? setShowAddModal(true) : setShowAdminLogin(true)} 
           className={`p-2 rounded-lg transition-all shadow-md ${isAdmin ? "bg-yellow-500 text-black animate-bounce" : "bg-black text-yellow-500 hover:bg-zinc-800"}`}
         >
-          {isAdmin ? <PlusCircle size={24} /> : <Hammer size={24} />}
+          {isAdmin ? <PlusCircle size={24} /> : <ShoppingBag size={24} />}
         </button>
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <h1 className="font-black text-3xl leading-none uppercase italic tracking-tighter">Topázio</h1>
-          <p className="text-[11px] text-zinc-600 font-bold tracking-[0.3em] uppercase">AMBIENTES PLANEJADOS</p>
+          <h1 className="font-black text-3xl leading-none uppercase italic tracking-tighter">Sene Outlet</h1>
+          <p className="text-[11px] text-zinc-600 font-bold tracking-[0.3em] uppercase">MODA E CALÇADOS</p>
           {isAdmin && <span className="text-[10px] font-black text-yellow-600 mt-1">MODO ADMINISTRADOR ATIVO</span>}
         </div>
         <button 
-          onClick={() => window.open(`https://wa.me/5544998550741?text=Olá! Vi o site da Topázio e gostaria de um orçamento.`)}
+          onClick={() => window.open(`https://wa.me/5544997059600?text=Olá! Vi o site da Sene Outlet e gostaria de mais informações.`)}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-black transition-all active:scale-95 shadow-lg"
         >
           <MessageCircle size={18} /> <span className="hidden md:inline">WhatsApp</span>
@@ -215,19 +229,28 @@ export default function Page() {
                   </div>
                 </div>
                 <div className="p-8">
-                  <span className="text-zinc-500 font-black text-[10px] uppercase tracking-widest">{proj.material}</span>
-                  <h3 className="text-xl font-black text-zinc-900 uppercase italic tracking-tighter mb-2">{proj.titulo}</h3>
+                  <div className="flex justify-between items-start gap-2 mb-1">
+                    <div>
+                      <span className="text-zinc-500 font-black text-[10px] uppercase tracking-widest block">{proj.material}</span>
+                      <h3 className="text-xl font-black text-zinc-900 uppercase italic tracking-tighter">{proj.titulo}</h3>
+                    </div>
+                    {proj.preco && (
+                      <span className="bg-zinc-900 text-yellow-500 px-3 py-1 rounded-xl font-black text-sm shrink-0">
+                        {proj.preco}
+                      </span>
+                    )}
+                  </div>
                   {proj.descricao && <p className="text-zinc-600 text-sm font-medium italic mb-4 leading-relaxed">"{proj.descricao}"</p>}
                   
                   <button 
                      onClick={() => {
-                       const ambient = proj.categoria.toLowerCase();
-                       const msg = `Olá! Tenho interesse em um orçamento de um(a) ${ambient}. (Referência: ${proj.titulo})`;
-                       window.open(`https://wa.me/5544998550741?text=${encodeURIComponent(msg)}`);
+                       const precoTexto = proj.preco ? ` (${proj.preco})` : "";
+                       const msg = `Olá! Tenho interesse no produto: ${proj.titulo}${precoTexto}.`;
+                       window.open(`https://wa.me/5544997059600?text=${encodeURIComponent(msg)}`);
                      }}
-                     className="w-full py-3 bg-zinc-900 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-yellow-500 hover:text-black transition-all"
+                     className="w-full py-3 bg-zinc-900 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-yellow-500 hover:text-black transition-all mt-3"
                   >
-                    Solicitar Orçamento <ChevronRight size={16}/>
+                    Comprar / Consultar <ChevronRight size={16}/>
                   </button>
                 </div>
               </div>
@@ -241,17 +264,17 @@ export default function Page() {
         <div className="relative rounded-[3rem] p-10 md:p-16 shadow-2xl overflow-hidden border border-white/10">
           <div 
             className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.3]"
-            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1541123437800-1bb1317badc2?q=80&w=1920')` }}
+            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=1920')` }}
           />
           <div className="relative z-10 text-center">
             <Users className="mx-auto text-yellow-500 mb-6" size={40} />
-            <h2 className="font-black text-4xl uppercase italic tracking-tighter mb-6 text-white">Nossa História</h2>
+            <h2 className="font-black text-4xl uppercase italic tracking-tighter mb-6 text-white">Sobre Nós</h2>
             <div className="flex justify-center gap-3 mb-8">
                <span className="bg-white/10 backdrop-blur-sm text-white border border-white/20 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Maringá • PR</span>
-               <span className="bg-yellow-500 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">+17 Anos no Mercado</span>
+               <span className="bg-yellow-500 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Qualidade • Estilo • Preço Baixo</span>
             </div>
             <p className="text-zinc-100 font-medium leading-relaxed text-lg italic">
-              "Na <strong className="text-yellow-500 uppercase tracking-tighter">Topázio Ambientes Planejados</strong>, transformamos sonhos em realidade com precisão e acabamento impecável. Com mais de 17 anos de experiência no mercado de Maringá, nossa missão é entregar qualidade superior e design inteligente para cada canto do seu lar."
+              "Na <strong className="text-yellow-500 uppercase tracking-tighter">Sene Outlet</strong>, você encontra calçados, roupas femininas, masculinas e infantis com qualidade, estilo e preço baixo em Maringá."
             </p>
           </div>
         </div>
@@ -259,8 +282,8 @@ export default function Page() {
 
       <footer className="relative z-10 p-20 flex flex-col items-center justify-center">
         <div className="flex flex-col items-center text-center">
-          <h2 className="font-black text-5xl leading-none uppercase italic tracking-tighter text-zinc-900">Topázio</h2>
-          <p className="text-[12px] text-zinc-800 font-black tracking-[0.4em] uppercase mt-1 mb-4">AMBIENTES PLANEJADOS</p>
+          <h2 className="font-black text-5xl leading-none uppercase italic tracking-tighter text-zinc-900">Sene Outlet</h2>
+          <p className="text-[12px] text-zinc-800 font-black tracking-[0.4em] uppercase mt-1 mb-4">MODA E CALÇADOS</p>
           {isAdmin && (
             <button onClick={() => setIsAdmin(false)} className="mt-8 text-[11px] bg-red-600 text-white px-6 py-2 rounded-full font-black hover:bg-red-700 transition-all shadow-lg">SAIR DO MODO ADMIN</button>
           )}
@@ -272,21 +295,24 @@ export default function Page() {
           <div className="bg-zinc-900 text-white p-8 rounded-[3rem] w-full max-w-2xl border border-zinc-800 shadow-2xl my-8">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-3xl font-black text-yellow-500 uppercase italic tracking-tighter">
-                {editingId ? "Editar Projeto" : "Novo Projeto"}
+                {editingId ? "Editar Produto" : "Novo Produto"}
               </h2>
-              <button onClick={() => {setShowAddModal(false); setEditingId(null); setPreviewMedia([]); setNewTitle(""); setNewMaterial(""); setNewDescription("");}} className="text-white hover:bg-red-600 p-2 bg-zinc-800 rounded-full transition-colors"><X/></button>
+              <button onClick={() => {setShowAddModal(false); setEditingId(null); setPreviewMedia([]); setNewTitle(""); setNewMaterial(""); setNewPrice(""); setNewDescription("");}} className="text-white hover:bg-red-600 p-2 bg-zinc-800 rounded-full transition-colors"><X/></button>
             </div>
 
             <div className="space-y-6">
               <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700">
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Título do Projeto" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+                    <input className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Nome do Produto" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
                     <select className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-black outline-none focus:border-yellow-500" value={newCategory} onChange={e => setNewCategory(e.target.value)}>
                       {CATEGORIES.map(c => <option key={c} value={c} className="bg-zinc-900">{c}</option>)}
                     </select>
                   </div>
-                  <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Material" value={newMaterial} onChange={e => setNewMaterial(e.target.value)} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Tamanhos / Marca" value={newMaterial} onChange={e => setNewMaterial(e.target.value)} />
+                    <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Valor (ex: R$ 89,90)" value={newPrice} onChange={e => setNewPrice(e.target.value)} />
+                  </div>
                   <textarea className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-medium h-24 resize-none outline-none focus:border-yellow-500" placeholder="Descrição curta..." value={newDescription} onChange={e => setNewDescription(e.target.value)} />
                   
                   {previewMedia.length > 0 && (
@@ -324,7 +350,7 @@ export default function Page() {
                   </div>
 
                   <button onClick={handlePublish} className="w-full bg-yellow-500 text-black py-4 rounded-xl font-black uppercase shadow-xl hover:bg-yellow-400 transition-all mt-4">
-                    {editingId ? "Salvar Alterações" : "Publicar Projeto +"}
+                    {editingId ? "Salvar Alterações" : "Publicar Produto +"}
                   </button>
                 </div>
               </div>
@@ -342,9 +368,9 @@ export default function Page() {
               type="password" placeholder="SENHA" 
               className="w-full p-6 bg-zinc-800 rounded-2xl text-white text-center mb-6 border-2 border-zinc-700 focus:border-yellow-500 text-3xl font-black tracking-[0.5em] outline-none"
               value={password} onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (password === "0741" ? (setIsAdmin(true), setShowAdminLogin(false), setPassword("")) : alert("Senha Errada"))}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
             />
-            <button onClick={() => password === "0741" ? (setIsAdmin(true), setShowAdminLogin(false), setPassword("")) : alert("Senha Errada")} className="w-full bg-yellow-500 text-black p-6 rounded-2xl font-black text-xl uppercase shadow-lg hover:bg-yellow-400 transition-all">Entrar</button>
+            <button onClick={handleLogin} className="w-full bg-yellow-500 text-black p-6 rounded-2xl font-black text-xl uppercase shadow-lg hover:bg-yellow-400 transition-all">Entrar</button>
           </div>
         </div>
       )}
