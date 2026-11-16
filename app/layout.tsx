@@ -1,54 +1,412 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+"use client";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import { useState, useRef, useEffect } from 'react';
+import { ShoppingBag, MessageCircle, Lock, X, ChevronRight, ChevronLeft, Camera, Trash2, Edit3, PlusCircle, Users } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const CATEGORIES = ["OUTROS", "CALÇADOS", "ROUPAS", "FEMININAS", "MASCULINO", "INFANTIL"];
 
-export const metadata: Metadata = {
-  // Isso ajuda o Next.js a montar os links das imagens sozinho
-  metadataBase: new URL('https://topazio-site.vercel.app'),
+export default function Page() {
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false); 
+  const [password, setPassword] = useState("");
+  const [activeCategory, setActiveCategory] = useState("CALÇADOS");
+  const [editingId, setEditingId] = useState<number | string | null>(null);
   
-  title: 'Topázio Ambientes Planejados | Móveis Sob Medida em Maringá',
-  description: 'Móveis planejados de alto padrão em Maringá-PR. 17 anos de tradição, qualidade e acabamento impecável.',
-  keywords: ['móveis planejados Maringá', 'Topázio Ambientes', 'marcenaria Maringá', 'cozinha planejada'],
-  
-  openGraph: {
-    title: 'Topázio Ambientes Planejados',
-    description: 'Qualidade, precisão e acabamento em cada detalhe.',
-    url: 'https://topazio-site.vercel.app',
-    siteName: 'Topázio Planejados',
-    images: [
-      {
-        url: '/logo-topazio.png', // O Next.js busca dentro da pasta public
-        width: 1200,
-        height: 630,
-        alt: 'Topázio Ambientes Planejados',
-      },
-    ],
-    locale: 'pt_BR',
-    type: 'website',
-  },
-}
+  const [backgroundImage, setBackgroundImage] = useState("https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1920");
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+  const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("CALÇADOS");
+  const [newMaterial, setNewMaterial] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newDescription, setNewDescription] = useState(""); 
+  
+  const [previewMedia, setPreviewMedia] = useState<{ url: string, type: 'image' | 'video' }[]>([]);
+  const [carouselIndices, setCarouselIndices] = useState<{[key: string]: number}>({});
+  const [projects, setProjects] = useState<any[]>([]);
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  const bgFileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchProjects();
+    const savedBg = localStorage.getItem('sene_bg_image');
+    if (savedBg) setBackgroundImage(savedBg);
+  }, []);
+
+  async function fetchProjects() {
+    try {
+      const { data, error } = await supabase
+        .from('projetos')
+        .select('*')
+        .order('id', { ascending: false });
+
+      if (error) throw error;
+      if (data) {
+        const formatted = data.map((p: any) => ({
+          ...p,
+          images: p.images || (p.imagem_url ? [{ url: p.imagem_url, type: 'image' }] : [])
+        }));
+        setProjects(formatted);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar produtos:", err);
+    }
+  }
+
+  const handleNextImage = (projId: any, max: number) => {
+    setCarouselIndices(prev => ({ ...prev, [projId]: ((prev[projId] || 0) + 1) % max }));
+  };
+
+  const handlePrevImage = (projId: any, max: number) => {
+    setCarouselIndices(prev => ({ ...prev, [projId]: ((prev[projId] || 0) - 1 + max) % max }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const filesArray = Array.from(files);
+      const promises = filesArray.map(file => {
+        return new Promise<{ url: string, type: 'image' | 'video' }>((resolve) => {
+          const isVideo = file.type.startsWith('video/');
+          const reader = new FileReader();
+          reader.onloadend = () => resolve({ url: reader.result as string, type: isVideo ? 'video' : 'image' });
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(promises).then(results => {
+        setPreviewMedia(prev => [...prev, ...results]);
+        if (fileInput.current) fileInput.current.value = "";
+      });
+    }
+  };
+
+  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const res = reader.result as string;
+        setBackgroundImage(res);
+        localStorage.setItem('sene_bg_image', res);
+        alert("Imagem de fundo alterada com sucesso!");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!newTitle || previewMedia.length === 0) return alert("Preencha o título e selecione pelo menos uma foto!");
+    
+    const projectData = {
+      titulo: newTitle,
+      categoria: newCategory,
+      material: newMaterial,
+      preco: newPrice,
+      descricao: newDescription, 
+      imagem_url: previewMedia[0].url,
+      images: [...previewMedia] 
+    };
+
+    try {
+      if (editingId) {
+        const { error } = await supabase
+          .from('projetos')
+          .update(projectData)
+          .eq('id', editingId);
+
+        if (error) throw error;
+        alert("Produto atualizado com sucesso!");
+      } else {
+        const { error } = await supabase
+          .from('projetos')
+          .insert([projectData]);
+        if (error) throw error;
+        alert("Produto publicado com sucesso!");
+      }
+
+      setNewTitle(""); 
+      setNewMaterial(""); 
+      setNewPrice("");
+      setNewDescription(""); 
+      setPreviewMedia([]);
+      setEditingId(null);
+      setShowAddModal(false);
+      await fetchProjects();
+    } catch (err: any) {
+      alert("Erro no Supabase: " + err.message);
+    }
+  };
+
+  const deleteProject = async (id: any) => {
+    if(confirm("Tem certeza que deseja excluir este produto?")) {
+      const { error } = await supabase.from('projetos').delete().eq('id', id);
+      if (error) return alert("Erro ao excluir");
+      fetchProjects();
+    }
+  };
+
+  const startEdit = (proj: any) => {
+    setEditingId(proj.id);
+    setNewTitle(proj.titulo);
+    setNewCategory(proj.categoria || "CALÇADOS");
+    setNewMaterial(proj.material || "");
+    setNewPrice(proj.preco || "");
+    setNewDescription(proj.descricao || "");
+    setPreviewMedia(proj.images || []);
+    setShowAddModal(true); 
+  };
+
+  const handleLogin = () => {
+    if (password === "0741") {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setPassword("");
+    } else {
+      alert("Senha Errada");
+    }
+  };
+
+  const filteredProjects = projects.filter(p => p.categoria === activeCategory);
+
   return (
-    <html
-      lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
+    <main className="min-h-screen font-sans text-zinc-900 relative">
+      <div 
+        className="fixed inset-0 z-0 opacity-30 pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-500"
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+      />
+
+      <nav className="p-4 bg-white/90 backdrop-blur-md text-black flex items-center sticky top-0 z-40 shadow-sm border-b border-yellow-500/20">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => isAdmin ? setShowAddModal(true) : setShowAdminLogin(true)} 
+            className={`p-2 rounded-lg transition-all shadow-md ${isAdmin ? "bg-yellow-500 text-black animate-bounce" : "bg-black text-yellow-500 hover:bg-zinc-800"}`}
+            title={isAdmin ? "Adicionar Produto" : "Entrar como Admin"}
+          >
+            {isAdmin ? <PlusCircle size={24} /> : <ShoppingBag size={24} />}
+          </button>
+
+          {isAdmin && (
+            <button 
+              onClick={() => bgFileInput.current?.click()}
+              className="bg-zinc-900 text-yellow-500 hover:bg-zinc-800 px-3 py-2 rounded-lg text-xs font-black flex items-center gap-1 shadow-md transition-all"
+              title="Trocar Imagem de Fundo"
+            >
+              <Camera size={16} /> <span className="hidden sm:inline">Fundo</span>
+            </button>
+          )}
+          <input type="file" hidden ref={bgFileInput} onChange={handleBgFileChange} accept="image/*" />
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-2">
+          <h1 className="font-black text-2xl sm:text-3xl leading-none uppercase italic tracking-tighter">Sene Outlet</h1>
+          <p className="text-[10px] sm:text-[11px] text-zinc-600 font-bold tracking-[0.3em] uppercase">MODA E CALÇADOS</p>
+          {isAdmin && <span className="text-[9px] font-black text-yellow-600 mt-0.5">ADMIN ATIVO</span>}
+        </div>
+
+        <button 
+          onClick={() => window.open(`https://wa.me/5544997059600?text=Olá! Vi o site da Sene Outlet e gostaria de mais informações.`)}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-black transition-all active:scale-95 shadow-lg shrink-0"
+        >
+          <MessageCircle size={18} /> <span className="hidden md:inline">WhatsApp</span>
+        </button>
+      </nav>
+
+      <section className="relative z-10 max-w-6xl mx-auto px-6 pt-12">
+        <div className="flex flex-wrap justify-center gap-2 mb-10">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-4 py-2 rounded-full text-[10px] font-black tracking-widest transition-all border-2 ${
+                activeCategory === cat ? "bg-zinc-900 text-yellow-500 border-zinc-900 shadow-lg" : "bg-white/50 text-zinc-600 border-zinc-300 hover:border-zinc-500"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+          {filteredProjects.map((proj) => {
+            const currentIndex = carouselIndices[proj.id] || 0;
+            const currentMedia = proj.images?.[currentIndex] || { url: proj.imagem_url, type: 'image' };
+
+            return (
+              <div key={proj.id} className="bg-white/80 backdrop-blur-sm rounded-[2.5rem] overflow-hidden shadow-xl border border-white/50 group transition-all hover:shadow-2xl relative">
+                {isAdmin && (
+                  <div className="absolute top-3 right-3 z-30 flex gap-2">
+                    <button onClick={() => startEdit(proj)} className="bg-white text-black p-2 rounded-lg shadow-md border border-zinc-200"><Edit3 size={18}/></button>
+                    <button onClick={() => deleteProject(proj.id)} className="bg-red-600 text-white p-2 rounded-lg shadow-md"><Trash2 size={18}/></button>
+                  </div>
+                )}
+
+                <div className="aspect-square relative overflow-hidden bg-zinc-200">
+                  {currentMedia.type === 'video' ? (
+                    <video src={currentMedia.url} controls className="w-full h-full object-contain" />
+                  ) : (
+                    <img src={currentMedia.url} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700" alt={proj.titulo} />
+                  )}
+                  
+                  {proj.images?.length > 1 && (
+                    <>
+                      <button onClick={() => handlePrevImage(proj.id, proj.images.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full z-20 backdrop-blur-sm transition-all"><ChevronLeft size={20}/></button>
+                      <button onClick={() => handleNextImage(proj.id, proj.images.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full z-20 backdrop-blur-sm transition-all"><ChevronRight size={20}/></button>
+                    </>
+                  )}
+
+                  <div className="absolute top-4 left-4 bg-yellow-500 text-black text-[9px] px-3 py-1 rounded-full font-black uppercase shadow-md z-10">
+                    {proj.categoria}
+                  </div>
+                </div>
+                <div className="p-8">
+                  <div className="flex justify-between items-start gap-2 mb-1">
+                    <div>
+                      <span className="text-zinc-500 font-black text-[10px] uppercase tracking-widest block">{proj.material}</span>
+                      <h3 className="text-xl font-black text-zinc-900 uppercase italic tracking-tighter">{proj.titulo}</h3>
+                    </div>
+                    {proj.preco && (
+                      <span className="bg-zinc-900 text-yellow-500 px-3 py-1 rounded-xl font-black text-sm shrink-0">
+                        {proj.preco}
+                      </span>
+                    )}
+                  </div>
+                  {proj.descricao && <p className="text-zinc-600 text-sm font-medium italic mb-4 leading-relaxed">"{proj.descricao}"</p>}
+                  
+                  <button 
+                     onClick={() => {
+                       const precoTexto = proj.preco ? ` (${proj.preco})` : "";
+                       const msg = `Olá! Tenho interesse no produto: ${proj.titulo}${precoTexto}.`;
+                       window.open(`https://wa.me/5544997059600?text=${encodeURIComponent(msg)}`);
+                     }}
+                     className="w-full py-3 bg-zinc-900 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-yellow-500 hover:text-black transition-all mt-3"
+                  >
+                    Comprar / Consultar <ChevronRight size={16}/>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* SEÇÃO HISTÓRIA */}
+      <section className="relative z-10 max-w-4xl mx-auto px-6 py-20">
+        <div className="relative rounded-[3rem] p-10 md:p-16 shadow-2xl overflow-hidden border border-white/10">
+          <div 
+            className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.3]"
+            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=1920')` }}
+          />
+          <div className="relative z-10 text-center">
+            <Users className="mx-auto text-yellow-500 mb-6" size={40} />
+            <h2 className="font-black text-4xl uppercase italic tracking-tighter mb-6 text-white">Sobre Nós</h2>
+            <div className="flex justify-center gap-3 mb-8">
+               <span className="bg-white/10 backdrop-blur-sm text-white border border-white/20 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Maringá • PR</span>
+               <span className="bg-yellow-500 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Qualidade • Estilo • Preço Baixo</span>
+            </div>
+            <p className="text-zinc-100 font-medium leading-relaxed text-lg italic">
+              "Na <strong className="text-yellow-500 uppercase tracking-tighter">Sene Outlet</strong>, você encontra calçados, roupas femininas, masculinas e infantis com qualidade, estilo e preço baixo em Maringá."
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="relative z-10 p-20 flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center text-center">
+          <h2 className="font-black text-5xl leading-none uppercase italic tracking-tighter text-zinc-900">Sene Outlet</h2>
+          <p className="text-[12px] text-zinc-800 font-black tracking-[0.4em] uppercase mt-1 mb-4">MODA E CALÇADOS</p>
+          {isAdmin && (
+            <button onClick={() => setIsAdmin(false)} className="mt-8 text-[11px] bg-red-600 text-white px-6 py-2 rounded-full font-black hover:bg-red-700 transition-all shadow-lg">SAIR DO MODO ADMIN</button>
+          )}
+        </div>
+      </footer>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/90 z-[60] overflow-y-auto p-4 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-zinc-900 text-white p-8 rounded-[3rem] w-full max-w-2xl border border-zinc-800 shadow-2xl my-8">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-yellow-500 uppercase italic tracking-tighter">
+                {editingId ? "Editar Produto" : "Novo Produto"}
+              </h2>
+              <button onClick={() => {setShowAddModal(false); setEditingId(null); setPreviewMedia([]); setNewTitle(""); setNewMaterial(""); setNewPrice(""); setNewDescription("");}} className="text-white hover:bg-red-600 p-2 bg-zinc-800 rounded-full transition-colors"><X/></button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Nome do Produto" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+                    <select className="bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-black outline-none focus:border-yellow-500" value={newCategory} onChange={e => setNewCategory(e.target.value)}>
+                      {CATEGORIES.map(c => <option key={c} value={c} className="bg-zinc-900">{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Tamanhos / Marca" value={newMaterial} onChange={e => setNewMaterial(e.target.value)} />
+                    <input className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-bold outline-none focus:border-yellow-500" placeholder="Valor (ex: R$ 89,90)" value={newPrice} onChange={e => setNewPrice(e.target.value)} />
+                  </div>
+                  <textarea className="w-full bg-zinc-900 p-5 rounded-xl border border-zinc-700 text-white font-medium h-24 resize-none outline-none focus:border-yellow-500" placeholder="Descrição curta..." value={newDescription} onChange={e => setNewDescription(e.target.value)} />
+                  
+                  {previewMedia.length > 0 && (
+                    <div className="flex flex-col items-center p-2 bg-zinc-900/50 rounded-xl">
+                      <p className="text-yellow-500 text-[10px] font-black uppercase mb-1">
+                        {previewMedia.length} mídia(s) carregada(s)
+                      </p>
+                      <button 
+                        onClick={() => setPreviewMedia([])} 
+                        className="text-red-500 text-[10px] font-black uppercase hover:underline"
+                      >
+                        Limpar todas as mídias
+                      </button>
+                    </div>
+                  )}
+
+                  <div 
+                    onClick={() => fileInput.current?.click()} 
+                    className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                      previewMedia.length > 0 ? "border-yellow-500 bg-yellow-500/5" : "border-zinc-600 hover:border-zinc-400 hover:bg-zinc-800"
+                    }`}
+                  >
+                      <Camera className={previewMedia.length > 0 ? "text-yellow-500 mb-2" : "text-zinc-500 mb-2"} size={32} />
+                      <p className="text-xs font-black text-white uppercase tracking-tighter text-center">
+                        {previewMedia.length > 0 ? "Clique para adicionar mais mídias" : "Clique para selecionar várias Fotos/Vídeos"}
+                      </p>
+                      <input 
+                        type="file" 
+                        hidden 
+                        ref={fileInput} 
+                        multiple 
+                        onChange={handleFileChange} 
+                        accept="image/*,video/*" 
+                      />
+                  </div>
+
+                  <button onClick={handlePublish} className="w-full bg-yellow-500 text-black py-4 rounded-xl font-black uppercase shadow-xl hover:bg-yellow-400 transition-all mt-4">
+                    {editingId ? "Salvar Alterações" : "Publicar Produto +"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdminLogin && (
+        <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
+          <div className="bg-zinc-900 p-12 rounded-[3.5rem] w-full max-w-sm text-center border border-zinc-800 shadow-2xl relative">
+            <button onClick={() => setShowAdminLogin(false)} className="absolute top-8 right-8 text-white"><X size={24}/></button>
+            <Lock className="mx-auto text-yellow-500 mb-8" size={48} />
+            <input 
+              type="password" placeholder="SENHA" 
+              className="w-full p-6 bg-zinc-800 rounded-2xl text-white text-center mb-6 border-2 border-zinc-700 focus:border-yellow-500 text-3xl font-black tracking-[0.5em] outline-none"
+              value={password} onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
+            <button onClick={handleLogin} className="w-full bg-yellow-500 text-black p-6 rounded-2xl font-black text-xl uppercase shadow-lg hover:bg-yellow-400 transition-all">Entrar</button>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
